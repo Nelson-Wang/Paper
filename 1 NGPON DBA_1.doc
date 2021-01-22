@@ -1,0 +1,1327 @@
+1NGPON DBA
+
+1.1DBA技术概述
+1.1.1什么是DBA
+    DBA Dynamic Bandwith Allocation 动态带宽分配。
+
+    在XPON系统中，我从终端发送给局端的数据，即上行帧，需要局端给终端分配带宽才可以上行传输，局端如何进行带宽分配以满足ONU上行业务需求，获得更好的传输性能，对于多个ONU如何保证公平性，最大效率的分配带宽，是GPON系统中重要的一部分。
+
+    DBA(动态带宽分配) 从概念上是区别于静态带宽分配，静态带宽分配是一种固定的分配方式，比如通过局端配置可以给用户A固定地分5M，给用户B 分10m，这些带宽对于这些用户来讲均是独享的，但是却没有考虑到在复杂的网络中，用户对流量的需求可能是有变化的，比如A只需要2M，而B需要13M， 因此就会出现不能满足需求和带宽浪费的情况。因此需要使用一种新的带宽分配技术，G984.3定义个DBA方式，根据ONU突发业务量的需求，动态地分配他们的上行接入带宽，按需分配，以更好地满足用户需求，且提高带宽利用率
+
+1.1.23个概念
+Tcont ，GemPort ，Flow
+
+ 
+
+Tcont
+
+ONU上的带宽控制单元，在终端上用TcontId这个概念来标识Tcont，而在局端使用AllocId这个概念来标识不同ONU的各个Tcont，实现对上行带宽的控制。
+
+GemPort
+
+是OLT和ONU之间的业务虚通道，类似于ATM虚连接中的VPI/VCI标识，如果把GemPort理解为用户流量接入局端的通道，则Tcont就限制了这条通道的宽度，GemPortId 用以标识GemPort 。
+
+ 
+
+Flow
+
+此处为用户上行业务流，GemPort 根据ONU支持能力，可以承载1条或者多条业务流
+
+ 
+
+ 
+
+以一个实例来说明
+
+Tcont，GemPort 和Flow的关系如下图所示：
+
+
+
+
+ 
+
+图1  GPON中TcontId，PortId和DBA关系示意图
+
+ 
+
+ONUId 2 的1个Tcont 绑定3个GemPort，这3个GemPort 承载了4条业务流，
+
+那么这4条业务流将共同抢占局端分给这个Tcont 的资源。
+
+ONUId 3 的1个Tcont 仅绑定了1个GemPort，且这个GemPort只承载了1条业务流，
+
+那么这条业务流将独占局端分给这个Tcont的资源。
+
+可以看到OnuId 3 这种场景更加能够实现对业务流上行带宽的灵活控制。
+
+这也要求未来终端芯片可以支持更多的Tcont，通过1个Tcont对应1条业务流来实现局端对业务流上行带宽的灵活分配。
+
+1.2DBA特性在协议的具体实现
+1.2.1DBA的报告机制简述
+上文提到DBA的一大特点是按需分配，而局端如何实时了解终端需求，主要通过两种渠道：SR和NSR
+
+ 
+
+1.2.2SR(Status Reporting)
+局端指示终端通过协议特定报文上报自身缓存以获悉终端所需带宽。
+
+报告分两种
+
+A PLOu中的状态指示    （目前芯片实现不用这种方式）
+
+B DBRu的piggy-back报告 （目前芯片实现均用这种方式）
+
+1.2.3NSR (Non Status Reporting)
+无需终端上报，局端通过对上行Idle帧监控来推断终端所需要的带宽。（idle帧是指终端在分配的时间窗没有足够的数据报文传输时则会插入协议规定的特定码型Idle帧。
+
+比如局端分配100M带宽，而终端只需求50M，那么另外50M则会以Idle帧形式插入上传，局端由此获悉对终端该周期的分配是有浪费的，在下一周期可以减小分配带宽。
+
+ 
+
+注：以上两种模式对ONU来说可全支持或支持任意一种，但是所有的OLT必须同时支持SR和NSR两种方式。
+
+具体用哪种报告机制，在产品系统中是通过OMCI协商获得。目前多数ONU均支持两种报告机制，那么会协商出来是SR模式，而少量如法电的ONU只支持NSR模式，协商出来为NSR。
+
+ 
+
+1.2.4DBA在GTC字段的实现
+下文通过带宽下发和带宽上报两种维度介绍DBA在GTC帧是通过何种协议定义字段来实现
+
+1.2.4.1 带宽下发
+局端对终端进行带宽分配是通过下行帧的BwMap字段实现，BwMap在下行帧的物理控制域中，BwMap数目同AllcoId数相关，每个Bwmap占8B，当前帧若对N个Allcoid进行分配，则占用的字节数为N*8
+
+DownStream GTC:
+
+  
+
+
+
+
+
+AllocId
+
+表明在此帧被分配带宽的ONU的TcontId
+
+Flag
+
+Plsuf:    发送功率调节序列，目前此字段被废弃
+
+PLOAMuf：指示ONU是否发送上行PLOAM消息
+
+FEC：   指示ONU是否进行上行FEC
+
+DBRu：  指示ONU piggy-back上报的模式
+
+         00：不发送；      01：模式0（2B）；
+
+10：模式1（3B）；
+
+Sstart
+
+指示ONU的上行帧的起始位置，如Sstart值为19310 表明该ONU该Allocid的上行数据在该上行帧的第19310B开始传
+
+Sstop
+
+指示ONU的上行帧的结束位置，如Sstop值为19320 表明该ONU该Allocid的上行数据在该上行帧的第19320B结束。
+
+通过sstart 和sstop的差值可以获悉该下行帧给ONU分配
+
+的带宽为19320-19310+1=11（B/frame）
+
+CRC
+
+校验序列，由于bwmap是个相当重要的字段，一旦出错，很可能会造
+
+成ONU上行数据冲突，因此设置CRC字段作校验。
+
+ 
+
+ 
+
+1.2.4.2 带宽上报
+ONU通过DBRu字段进行带宽上报，该字段可有可无，比如当前为NSR报告机制，则没有DRBu字段，或者当前是固定带宽分配，也没有DBRu字段。是否有DBRu以及DBRu的模式由下行帧Bwmap Flag域来指示，如上文。                           
+
+Upstream GTC：
+
+
+
+
+ 
+
+DBRu 有3种模式，GPON协议中定义其作用如下表格：
+
+DBRuMode
+
+Length(B)
+
+Description
+
+0
+
+2
+
+报告T-CONT缓存区用于PCR令牌的数据总数（1B）
+
+1
+
+3
+
+报告T-CONT缓存区用于PCR令牌（1B）和SCR令牌（1B）
+
+的数据总数
+
+1.2.5DBA在XGTC字段的实现
+ 
+
+Downstream XGTC ：
+
+ 
+
+
+
+
+
+AllocId
+
+表明在此帧被分配带宽的ONU 的TcontId
+
+Flag
+
+DBRu：1bit，用于指示ONU是否发送DBRu。
+
+PLOAMu：1bit，用于指示ONU是否发送PLOAMu消息。对于同一个burst的其他的Alloction Structure，PLOAMu flag应该置为0。
+
+Sstart
+
+该时间以4字节为单位，用于指示上行XGTC burst第一个字节开始的位置，不包括PSBu域
+
+对于同一个ONU的连续Alloc-ID，第一个分配间隙的StartTime指向突发合法数据传输的开始，后面的分配间隙的StartTime被设置成0xFFFF用以指示这些分配结构是连续的
+
+GrantSize
+
+指示该分配间隙传送数据的长度，以4字节为单位。GrantSize 不包括 XGTC header， XGTC trailer， or FEC overhead。最小值为1，用于只有DBRu的传输。
+
+FWI
+
+对处于低功耗模式的ONU的唤醒指示
+
+BProfile
+
+具体内容由BProfile这种类型的PLOAM消息来确定
+
+HEC
+
+帧头的检错和纠错功能
+
+ 
+
+与gpon bwmap的主要区别 1是由startime+ stoptime 指示分配时隙的结构变为由startime+grantsize 对于同一个burst的多个bwmap无需精确每个bwmap的start和stop值，实现更加简单， 同时增加了FWI字段 增加对低功耗ONU的唤醒指示 以及BProfile在bwmap里面就可控制burst的前导定界和下行FEC状态
+
+ 
+
+Upstream XGTC：
+
+ 
+
+同样DBRu 字段是否存在由下行帧BwMap的Flag域来指示
+
+
+
+
+ 
+
+BufOcc：buffer occupancy
+
+跟gpon相比 xgpon就只有一种DBRu Mode
+
+ 
+
+1.2.6五种协议带宽类型
+1.2.6.1 4种带宽成分
+协议定义了4种不同优先级的带宽类型，本文将之称为带宽成分，区别于TYPE1~TYPE5
+
+5个带宽类型。
+
+ 
+
+ 
+
+固定带宽（FIXed）
+
+是一种周期性分配完全预约的带宽，不管终端是否需要，局端固定的分配带宽给终端。
+
+ 
+
+确保带宽（Assured）
+
+当某Tcont被分配此种类型带宽时，在局端会预先保留此类型带宽值，当所承载业务流有需要时，则局端保证会将配置大小范围内的此带宽分给该Tcont，当没有需要时，则不会进行分配。
+
+ 
+
+非确保带宽（Non-assured）
+
+是分配给具有确保带宽的T-CONT的额外带宽，它只在分配了固定和确保带宽之后仍有剩余的情况下才能获得分配
+
+尽力转发（Best-effort ）
+
+优先级最低，它只在分配了固定和确保带宽和不确保带宽之后仍有剩余的情况下才能获得分配。
+
+ 
+
+四种分配带宽的优先级如下所示：
+
+Priority 1 (Highest priority)：FIXed bandwidth
+
+Priority 2              ：Assured bandwidth
+
+Priority 3              ：Non-assured bandwidth
+
+Priority 4 (Lowest priority)：Best effort bandwidth
+
+ 
+
+其中尽力转发（（Best-effort ））带宽类型，协议又定义了4个优先级，同等优先级之间可以配置权重差异。
+
+1.2.6.2 5种DBA带宽类型
+5种DBA带宽类型则是这4种成分的不同组合
+
+表1 带宽参数和T-CONT类型对应关系表
+
+
+
+    由上表可见type1 类型带宽为固定带宽，type2 类型为确保带宽，type3类型包含了确保和非确保带宽，type4类型带宽为尽力转发带宽，type5包含了所有类型的带宽。
+
+    备注：用户界面TCONT type1~5类型带宽配置为：fix + ab + max，type1只有fix，type2只有ab，type3只有ab和max，max-ab剩余部分为nab带宽，type4只有max（即为be带宽），type5包含fix、ab、max，无法区分max-ab-fix后剩余部分nab、be带宽大小，华为实现将协议type5拆分为type5、type6，明确max-ab-fix剩余部分要么为nab，要么为be。
+
+以上协议实现可参考：
+
+G984.3
+
+G987.3
+
+
+ 
+
+1.3DBA产品化分层实现
+1.3.1概述
+    本章节简述我司接入产品从主机到单板驱动到GMAC驱动再到逻辑内部是如何实现DBA功能的，从最上层的主机软件开始进行介绍，从上到下描述DBA从配置到实现的过程，并对DBA特性的各项参数做了两类划分：*外部可见以及协议参数 *内部原理相关参数，便于不同层级的测试人员进行理解，并且在本章节对外部和协议参数进行详细地配置以及原理介绍，涉及GPON带宽类型，ETH带宽类型，最小时延模式，最大带宽利用率模式，计算周期，下发周期，单多帧标识等概念。
+
+1.3.2总体流程简介
+下面简单介绍用户在主机界面添加ONU，配置Tcont，绑定DBA模板，并建立GemPort配置业务流的过程在各个层级之间如何体现
+
+
+
+ 
+
+1.3.3两类DBA配置参数划分
+上面所说的DBA配置参数非常多，为了便于理解，划分两类：
+
+第一类包含 跟协议相关的 5种带宽类型， 还有为了达到特定性能效果的以太类型，最小时延模式和最大带宽利用率模式
+
+上述配置都是对外开放可以在主机软件下直接进行配置的参数
+
+第二类是各种内部配置参数如：计算周期 下发周期 单多帧标识 预分配使能开关 等
+
+ 
+
+其中最小时延和最大带宽两种不同的性能效果配置模式通过某些内部配置参数不同组合而成。
+
+这类参数一般不对外开发，部分参数作为特定性能模式的初始值
+
+
+
+
+这些参数功能在下面章节会重点介绍。
+
+1.2DBA用户界面
+这里所讲的DBA参数主要就是4.3节所描述的协议以及外部参数
+
+1.4.1带宽类型和大小的配置
+我司主机软件配置主要表现对这5种协议带宽类型的配置
+
+具体操作为：1）配置DBA模板 2）将DBA模板绑定Tcont
+
+ 
+
+1.4.1.1 操作命令行
+第一步添加DBA模板，第二步将DBA模板同Tcont进行绑定
+
+ 
+
+1）MA5600T(config)# dba-profile add profile-id 13 type1 fix 1024
+
+2） MA5600T(config)#ont-lineprofile epon profile-id 1 
+
+MA5600T(config-epon-lineprofile-1)#Tcont 1 dba-profile-id 13
+
+MA5600T(config-epon-lineprofile-1)#commit
+
+ 
+
+对应于协议介绍的5种带宽类型，我司系统提供5种DBA模板。
+
+MA5600T(config)# dba-profile add profile-id 13 type1 fix 1024
+
+MA5600T(config)#dba-profile add profile-id 14 type2 assure 1024
+
+MA5600T(config)#dba-profile add profile-id 15 type3 assure 1024 max 2048
+
+MA5600T(config)#dba-profile add profile-id 16 type4 max 2048
+
+MA5600T(config)#dba-profile add profile-id 17 type5 FIX 1024 assure 1024 max2048
+
+1.4.1.2 原理介绍
+在3.4章节协议定义的4种带宽成分和5种带宽类型在我司的实现略有不同
+
+协议定义的TYPE5类型包含了FIX AB NAB BE 4种成分，我司实现仅包含FIX AB BE 3种
+
+带宽成分，另外提供一种FIX+AB+NAB的带宽类型在调试命令下配置
+
+Type
+
+带宽成分
+
+带宽配置参数
+
+ 
+
+Type1
+
+FIX
+
+FIX
+
+ 
+
+Type2
+
+AB
+
+AB
+
+ 
+
+Type3
+
+AB+NAB
+
+AB+MAX
+
+NAB=MAX-AB
+
+Type4
+
+BE
+
+MAX
+
+BE=MAX
+
+Type5
+
+FIX+AB+BE
+
+FIX+AB+MAX
+
+BE=MAX-FIX-AB
+
+Type5（diagnose）
+
+FIX+AB+NAB
+
+FIX+AB+MAX
+
+NAB=MAX-FIX-AB
+
+ 
+
+MA5600T(diagnose)%%
+
+dba-profile add profile-id 18 type5 FIX 1024 assure 1024 max 2048
+
+{ <cr>|additional-bandwidth<K>|assignment-frequency<K> } :additional-bandwidth
+
+{ additional_bandwidth_value<E><non-assure，best-effort，both> }: non-assure
+
+此additional_bandwidth_value 提供的选项中处选择non-assure 为type5a类型
+
+选择best-effort 为type5b类型 ，“both” 目前gpon系统不支持。
+
+ 
+
+测试的时候需要特别注意配置的TYPE5是含有哪种带宽成分，对优先级测试等才能准确判断。
+
+ 
+
+1.4.2两种全局带宽模式配置 GPON/ETH
+1.4.2.1 操作命令行：
+MA5600T(config)#gpon dba bandwidth-type
+
+ { gpon<K>|ethernet<K> }:
+
+1.4.2.2 原理介绍：
+GPON模式区别于ETH模式的一种叫法，是按照协议实现带宽配置的一种模式
+
+即通过DBA模板配置的带宽是包含GEM开销的
+
+ 
+
+如用户配置1个FIX 5M带宽，则该带宽默认承载了以太包前面的GEM帧头开销。
+
+ 
+
+由于主机配置带宽值的对象是GEM帧，包含了5ByteGEM帧头，而以太网传输中又包含了20Byte的前导和帧间隙开销，因此从配置的带宽值到用户带宽存在一定的差异，如下图:
+
+
+
+
+由于用户经常关注的是以太网流量的达成情况，为了便于配置带宽同实际流量的比较，芯片通过开发以太网带宽这种类型，希望实现以太网流量尽可能等同于配置带宽值；而GPON类型则保留了开销差异这种情况。
+
+如配置FIX 100M带宽，发送远超过配置带宽的流量，100B包长，观察接收流量，GPON模式可以到约112M，而以太模式则约为102M
+
+1.4.3两种性能效果模式配置 最小时延/最大带宽利用率
+1.4.3.1 操作命令行
+1）配置最大带宽利用率/最小时延模式/手动模式
+
+MA5600T(config)#gpon dba bandwidth-assignment-mode
+
+{ mode-value<E><max-bandwidth-usage，min-loop-delay，manual> }:
+
+ 
+
+此处输入max-bandwidth-usage 为最大带宽利用率模式
+
+    输入min-loop-delay        为最小时延模式
+
+    输入 manual              为手动模式
+
+注意：在每次切换模式的时候，需要删除pon系统中所有的Tcont。
+
+ 
+
+2) 查看当前模式
+
+MA5600T(config)#display gpon dba
+
+ 
+
+3) 手动模式配置
+
+ 
+
+上面讲到这两种外部性能效果配置是由不同的内部参数为了达到某种特定效果组合而成
+
+这些内部参数主要是计算周期，下发周期，单多帧标识
+
+系统提供一种手动模式可以进行内部参数配置
+
+在手动模式下设置DBA搜集周期，计算周期，单多帧标识
+
+注： 只有在手动模式下DBA搜集计算周期，单多帧标识的修改才会生效
+
+A 设置DBA周期
+
+GMAC 逻辑对搜集周期，计算周期是统一实现的，把它统称为DBA周期，在主机上均通过calculate-period这个参数的设置来实现 。
+
+如将单板0/2 DBA周期设置为32
+
+MA5600T(diagnose)%%gpon dba calculate-period
+
+{ frameid/slotid<S><Length 3-15> }:0/2
+
+{ calculate-period<E><1，2，4，8，16，32> }:32
+
+ 
+
+  Command:
+
+          gpon dba calculate-period 0/2 32
+
+B 设置单多帧标识
+
+GMAC 逻辑对下发频率的实现是同DBA周期相统一的，当DBA周期为N，下发频率只可能有两种情况每帧下发1次，或者N帧下发1次。在主机配置中通过diagnose模式下DBA模板添加中对assignment-frequency 进行设置，当设置为calculate-period 为N帧下发1次，single-frame  每帧下发1次，其中默认为每帧下发1次
+
+ 如下添加11号DBA模板FIX 1m，N帧下发1次
+
+MA5600T(diagnose)%%dba-profile add profile-id 11
+
+{ profile-name<K>|type1<K>|type2<K>|type3<K>|type4<K>|type5<K> }:type1
+
+{ FIX<K> }:FIX
+
+{ FIX-bandwidth<U><128，1235456> }:1024
+
+{ <cr>|assignment-frequency<K>|bandwidth_compensate<K> }:assignment-frequency
+
+{ assignment_frequency_value<E><calculate-period，single-frame> }:calculate-period
+
+{ <cr>|bandwidth_compensate<K> }:
+
+ 
+
+Command:
+
+dba-profile add profile-id 11 type1 FIX 1024 assignment-frequency
+
+calculate-period
+
+      
+
+主机进行对DBA模式的配置之后，其设置参数通过单板适配层传递给SDK层，由SDK去刷新逻辑DBA带宽配置表项。
+
+ 
+
+1.4.3.2 原理介绍
+1.4.3.2.1 DBA处理的3个流程
+局端DBA模块从搜集PCR到下发带宽经历了3个过程：
+
+（1）PCR搜集过程
+
+（2）带宽计算过程
+
+（3）带宽下发过程
+
+在系统初始是先搜集DBRu需求，然后进行DSP运算，再进行带宽下发
+
+如下处理流水图：
+
+
+
+
+ 
+
+可以看到在发流初始 第一个DBA周期系统只有DBA数据收集，搜集起来的第二个周期进行带宽计算同时开始新一轮的DBA搜集，在第三个周期对第一个周期上报值进行下发，同时对第二轮搜集值进行计算以及开始第三轮的DBA搜集。
+
+ 
+
+根据上述原理就很容易解释为什么发大流量的瞬间非固定带宽类型容易丢包，之后就不丢。
+
+是因为发流初始逻辑对初上报的需求在第三个周期才做对其需求的下发，如果流量很大，ONU缓存能力又比较小的时候，容易丢包。
+
+ 
+
+1.4.3.2.2 搜集周期 计算周期 下发周期 下发频率
+搜集周期、计算周期、下发周期均支持 1帧，2帧，4帧，8帧，16帧，32帧
+
+其中搜集周期默认等于计算周期不开放配置，下发周期不能超过计算周期
+
+且计算周期是下发周期的倍数 。
+
+比如计算周期为8，下发周期只能为1，2，4，8
+
+ 
+
+下发周期和单多帧标识构成下发频率的概念。
+
+ 
+
+当单多帧标识为1，表示单帧下发， 不管下发周期为多大，在1个DBA周期内每帧均有带宽下发   当单多帧标识为0，表示多帧下发，当下发周期为N，则在1个DBA周期 N帧下发1次比如DBA周期为4，下发周期为2，单多帧标识为0，则表示在1个DBA下发周期内2帧下发1次
+
+如下 芯片查询带宽表项的一个截图，可以看到，ONUID1 ALLCOI1 为4帧的计算周期，4帧的下发周期，且为多帧下发，则每个下发周期下方16*4=64B
+
+
+1.4.3.2.3 计算周期 下发周期是如何影响DBA性能？
+主要体现在DBA周期长短和单多帧的不同配置  
+
+ 
+
+* DBA周期长短的优缺点
+
+缺点：
+
+通过上图可以看出，从局端获得上报需求值到做相应带宽的下发存在一定时延，而ONU搜集和计算周期越长，ONU能够获得相应分配的时间就越长，从而使得待发送的流量囤积在ONU缓存中，一旦超出缓存范围则出现丢包。
+
+优点：
+
+因搜集周期长，可以对ONU缓存变化进行较好的监控，进行更加合理的分配，从而获得较好的带宽利用率。因为终端从PCR上报到获得分配存在时延，而这个过程终端的PCR值又产生了变化，也就是说终端分配到的带宽值，与实际所需存在差异，通过局端在长时间搜集，可以获得PCR值的变化情况，而据这种变化作出较合理的分配。
+
+ 
+
+*单多帧下发的优缺点
+
+缺点：
+
+同样多帧下发响应时间没有单帧下发好
+
+优点：
+
+（1）多帧下发使得小带宽大包长的场景获得更好的带宽利用率。
+
+举例：
+
+比如配置FIX 1M  计算周期为8，下发周期为8 单帧下发，则每帧下发16B带宽，
+
+同样计算周期和下发周期的条件下，多帧下发，在8帧下发周期里，每个周期下发16*8B的带宽
+
+如果发送110B的报文 配置单帧下发模式，每帧只有16B带宽，那么传输1个报文则需要切110/(16-5) =10个GEM分片包也就是说传输1个110B的报文需要10帧
+
+而8帧下发模式，每周期下发128B报文，扣除5B的GEM头，1个110B报文1次就可以发送也就是只需要8帧
+
+（2）对于多猫场景，多帧下发，可以节省GAP和DBRu带宽
+
+比如N个ONU，单帧下发，对于GPON，每帧GAP开销N*32B
+
+              多帧下发，每帧GAP开销 N*32B/下发周期
+
+ 
+
+ 
+
+1.4.3.3 两种性能模式的具体配置值
+由主机上层软件进行DBA模式的配置，主机版本提供了3种模式选择
+
+（1）最大带宽利用率模式
+
+（2）最小时延模式
+
+（3）手动模式
+
+各项参数如下（以下是V8R7的主机配置值，R7以上主机版本有刷新）以下仅供学习参考
+
+模式
+
+搜集周期(帧)
+
+计算周期（帧）
+
+下发频率
+
+最小时延
+
+N
+
+N
+
+N帧下发1次
+
+最大带宽利用率
+
+8
+
+8
+
+配置带宽<100M， 8帧下发1次
+
+配置带宽>=100M， 1帧下发1次
+
+手动模式
+
+1/2/4/8/16/32
+
+1/2/4/8/16/32
+
+1/2/4/8/16/32 帧下发1次；
+
+每帧下发1次
+
+ 
+
+GMAC逻辑DBA模块计算能力同Tcont数目相关，Tcont数越大，计算周期越长。
+
+能力关系如下表格：
+
+ 
+
+ 
+
+条件
+
+计算周期(帧)
+
+Total-Tcont-Num<=100
+
+Or
+
+NoFIX-Tcont-Num<=50
+
+1
+
+100<Total-Tcont-Num<=256
+
+Or
+
+50<NoFIX-Tcont-Num<=100
+
+2
+
+256<Total-Tcont-Num<=512
+
+Or
+
+100<NoFIX-Tcont-Num<=256
+
+4
+
+512<Total-Tcont-Num<=1024
+
+Or
+
+256<NoFIX-Tcont-Num<=512
+
+8
+
+ 
+
+注意
+
+其中1024为GMAC逻辑单pon口可以支持的最大的配置Tcont数目
+
+               512 为GMAC逻辑单pon口可以支持的最大带宽类型为非固定带宽的Tcont数
+
+ 
+
+Total-Tcont-num 为在线ONU所有绑定带宽的Tcont数目
+
+NoFIX-Tcont-Num为在线ONU DBA类型为非固定带宽 Tcont数目
+
+ 
+
+1.4.4单板驱动层索引逻辑DBA表项
+1.4.4.1 原理
+OLT分配带宽是通过AllocId来唯一标识OnuId的TcontId，AllocId同OnuId和TcontId的换算关系由单板软件进行计算，SD5110V200芯片SDK，单PON口最大支持128个ONU，1KTcont，且AllcoId取值范围0~4095，AllcoId 与ONUId TcontId 的关系仍延用V100的公式即
+
+AllcoId=ONUId+256*TcontId
+
+而SD5120以及之后的芯片单PON口最大支持254个ONU，2KTcont，且AllcoId取值范围仍然为0~4095，
+
+刷新了AllcoId的公式，0~254均配置给OnuId0~OnuId253的Tcont0，之后从256开始按照Onu上下线的顺序依次进行分配，是个动态的过程，主机软件对ONU的TCONT配置的带宽表项最终通过层级传递给逻辑表项BW-CFG表
+
+下面以SD5110V200芯片的驱动软件为例简述这个索引过程
+
+在SD5110V200芯片的配套驱动软件如何根据适配层针对AllcoId下发的带宽值去配置逻辑的带宽配置表，体现了一系列表项的索引过程。配置带宽属性表并不是直接通过AllcoId索引，而是SDK层通过DBA_IN_ONUALLOC表 （ONU查询ALLOC表）据ONUID 索引， DBA_IN_ONUALLOC表是逻辑内部21号表项存在于内部RAM，由1280个24bit表项组成，表项结构如下：
+
+DW
+
+23
+
+22
+
+21
+
+….
+
+12
+
+11
+
+…
+
+0
+
+0
+
+VLD
+
+Reserved
+
+NEXT_PTR
+
+Reserved
+
+ 
+
+…
+
+ 
+
+253
+
+VLD
+
+Reserved
+
+NEXT_PTR
+
+Reserved
+
+ 
+
+254
+
+Reserved
+
+ 
+
+255
+
+Reserved
+
+ 
+
+256
+
+VLD
+
+END
+
+NEXT_PTR
+
+ALLOC-ID
+
+ 
+
+…
+
+ 
+
+1279
+
+VLD
+
+END
+
+NEXT_PTR
+
+ALLOC-ID
+
+ 
+
+ 
+
+ 各字段意义如下：
+
+Name
+
+Width
+
+Description
+
+ALLOC-ID
+
+12
+
+T-CONT标识
+
+NEXT_PTR
+
+10
+
+指针，下一个地址，指向地址256~1279
+
+END
+
+1
+
+结束标志，高有效
+
+VLD
+
+1
+
+有效标志
+
+ 
+
+    
+
+SDK层通过MPI口直接访问地址，可以对表项内容进行正常读写操作，地址0~255即为ONU-ID，地址256~1279对应1024个T-CONT，它是NEXT_PTR（0~1023，分别指向256~1279的地址）所指向的地址。
+
+通过查找该表项获取AllcoId信息，然后由DBA_IN_INDEX_BWMAP(地址索引表)索引该Allocid在带宽配置表中的位置，
+
+此表项为逻辑内部16号表项存在于内部RAM，由4096个11bit表项组成，表项结构如下：
+
+DW
+
+10
+
+9
+
+…
+
+0
+
+0
+
+VLD
+
+ADDR
+
+…
+
+4095
+
+VLD
+
+ADDR
+
+各字段意义如下：
+
+Name
+
+Width
+
+Description
+
+VLD
+
+1
+
+ALLOC-ID是否有效的标识
+
+ADDR
+
+10
+
+ALLOC-ID对应的配置表（如：带宽配置表DBA_DBRU）存放的地址
+
+ 
+
+通过查询出来的address去匹配带宽配置表的index，则可以查询到该allocid对应的带宽配置信息。带宽配置表为27号表项，存在与内部RAM，由1024个82bit的表项组成，结构如下：
+
+
+各字段意义如下：
+
+Name
+
+Width
+
+Description
+
+V
+
+1
+
+有效标识
+
+S
+
+1
+
+单帧或多帧分配，1-单帧分，0-多帧分
+
+FEC
+
+1
+
+1：ONU计算并插入FEC
+
+0：ONU不计算和插入FEC
+
+TDM
+
+1
+
+TDM业务类型
+
+SR
+
+1
+
+1：上报
+
+0：非上报
+
+TYPE
+
+3
+
+T-CONT类型：
+
+001：Type1；010：Type2；011：Type3
+
+100：Type4；101：Type5；000，110~111：Reserved
+
+DBRU
+
+2
+
+发送DBRu模式：根据这两个bit，ONU将在相应的alloc-ID中发送或者不发送DBRu（上行动态带宽上报）：
+
+00: 不发送DBRu；
+
+01: 发送模式0 DBRu (two bytes)；
+
+10: 发送模式1 DBRu (three bytes)；
+
+11: 发送模式2 DBRu (five bytes).
+
+MAX
+
+16
+
+最大带宽
+
+NAB
+
+16
+
+非确保带宽（Non-Assured）
+
+AB
+
+16
+
+确保带宽（Assured）
+
+FIX
+
+16
+
+固定带宽（Fixed）（配置时不应小于最小带宽）
+
+MINBW
+
+8
+
+最小带宽
+
+ 
+
+通过单板提供查看表项的调试指令可以查询上述索引过程。
+
+查询ponportid 4ONUId 0 下所有Tcont的带宽配置表
+
+首先通过ONUId 0索引 其TCONTId
+
+H802GPBD>gmac show table
+
+ { OLTID:<0..7>[0] }:4
+
+ { Table number:<0..36>[0] }:21
+
+ { Table index:<0..1279>[0] }:0
+
+ { Item num:<1..1280>[1] }:1
+
+0: 0x00800000
+
+发现ONUId 0下个地址为0 则查询其AllcoId时从256开始索引
+
+ 
+
+H802GPBD>gmac show table
+
+ { OLTID:<0..7>[0] }:4
+
+ { Table number:<0..36>[0] }:21
+
+ { Table index:<0..1279>[0] }:256
+
+ { Item num:<1..1024>[1] }:10
+
+256: 0x00801000  1表明第二个allocid的地址为256+1，第一个allocid为0
+
+257: 0x00802100  2表明第三个allocid的地址为256+2，第二个allocid为100（hex）
+
+258: 0x00803200
+
+259: 0x00805300
+
+260: 0x00000000
+
+261: 0x00806500
+
+262: 0x00807600
+
+263: 0x00c00700
+
+264: 0x00000000
+
+265: 0x00000000
+
+ 
+
+以上查询结果表明ONUId 0下添加了6个TCONT，AllcoId 分别为0，256，512，768，1792
+
+下面查询allocid 512 对应的带宽配置表的索引号
+
+H802GPBD>gmac show table
+
+ { OLTID:<0..7>[0] }:4
+
+ { Table number:<0..36>[0] }:16
+
+ { Table index:<0..4095>[0] }:512
+
+ { Item num:<1..3584>[1] }:1
+
+512: 0x00000402
+
+ 以上结果表明allocid512对应于带宽配置表的索引号为2
+
+ H802GPBD>gmac show table
+
+ { OLTID:<0..7>[0] }:4
+
+ { Table number:<0..36>[0] }:27
+
+ { Table index:<0..1023>[0] }:2
+
+ { Item num:<1..1022>[1] }:1
+
+        2: 0x00000000 0x00032400 0x00000000 0x00005010
+
+ 
+
+1.4.4.2 测试关注
+SD5110V200之后的芯片单板软件对表项的索引均为链表结构，在单板软件层的测试人员需要严重关注ONU上下线对这个表项索引可能导致的影响
+
+ 
+
+1.4.5MAC逻辑DBA功能
+1.4.5.1 DSP算法实现流程
+1.4.5.1.1简述
+            较产品GPBC ASIC 化了的DBA算法，SD5110V200芯片 通过内置DSP可灵活编程来进行DBA算法处理，
+
+            通过软件提供操作接口，可以将算法直接导入或者导出ASIC芯片，这样可以随时改进DSP算法，将更新后的算法直接导入芯片即可。
+
+1.4.5.1.2详细流程
+下面以SD5110V200芯片为例简述DSP算法处理流程，后续芯片在DSP算法这块有不断优化。   
+
+DBA支持全部四种类型的带宽：FIX（固定带宽）、AB（确保带宽）、NAB（非确保带宽）和BE（尽力而为带宽）。
+
+对于四种类型的带宽，按照以下优先级处理：FIX > AB > NAB > BE。
+
+SR模式下分配流程如下图：
+
+ 
+
+ 
+
+ 
+
+首先进行带宽预处理，主要是进行一次分配前可用带宽的计算，计算完之后，对tcont带宽属性表进行4轮轮循处理，
+
+对tcont带宽属性表中第一个tcont fix类型带宽进行第一轮计算处理：计算分配后的剩余带宽，将待分配信息写入29号表项-带宽下发表供带宽下发模块进行处理，对一个tcont fix计算处理完成之后，判断是否还有tcont待分配，如果是则再进行第一轮对fix类型的分配，直至所有在线tcont fix 类型带宽全部处理完毕，再进行第二轮对ab类型带宽的处理，处理基本流程同fix，直至进行完对所有tcont四轮分配计算。
+
+ 
+
+缩写词说明
+
+Name
+
+Description
+
+Name
+
+Description
+
+bw_total
+
+总带宽
+
+fix
+
+CPU配置的固定带宽
+
+remain_pre
+
+预留带宽后的剩余带宽
+
+ab
+
+CPU配置的确保带宽
+
+remain_fix
+
+计算FIX类型后的剩余带宽
+
+max
+
+CPU配置的最大带宽（针对T-CONT）
+
+remain_ab
+
+计算AB类型后的剩余带宽
+
+minbw
+
+CPU配置的最小带宽（针对ONU）
+
+remain_nab
+
+计算NAB类型后的剩余带宽
+
+pcr
+
+Peak Cell Rate
+
+remain_be
+
+计算BE类型后的剩余带宽
+
+scr
+
+Sustained Cell Rate
+
+SR
+
+状态上报
+
+NSR
+
+非状态上报
+
+FIX
+
+固定类型的带宽
+
+AB
+
+确保类型的带宽
+
+NAB
+
+非确保类型的带宽
+
+BE
+
+尽力而为类型的带宽
+
+
+
+1.4.6剩余带宽计算方法
+       上行帧总带宽为19440B/Frame，是不是这些带宽可以完全用以传输用户数据呢？不是，在上行帧的总带宽中需要预留必要的字段。比如紧急PLOAM消息，上行帧的前导码，定界符，FEC，DBRu，
+
+出于带宽预留更加合理性的考虑，以V8R7主机版本对带宽的扣除方法都作了新的改进为例进行剩余带宽计算方法的描述。
+
+总带宽
+
+19440B/Frame  上行GTC帧总带宽
+
+预留给紧急PLOAM的带宽
+
+-52B/Frame    4个紧急PLOAM消息的长度
+
+添加一个ONU，预留GAP
+
+-32 B/Frame   包含了对上行帧的前导码，定界符
+
+的带宽预留
+
+添加一个启动FEC的ONU，预留给FEC的带宽
+
+(-1)×ONU最大带宽×16/239+16
+
+TYPE1
+
+带宽补偿不使能：(-1)×FIX
+
+带宽补偿使能： （-2）*FIX
+
+TYPE2
+
+(-1)*(AB+DBRU)
+
+TYPE3
+
+(-1)*(AB+DBRU)
+
+TYPE4
+
+(-1)*(MINBW+DBRU)
+
+TYPE5
+
+(-1)*(AB+FIX+DBRU)
+
+
+
+其中DBRU取最大值3B，MINBW 最小带宽在最大带宽利用率模式下MINBW=2B
+
+最小时延模式MINBW=16B
+
+
+
+
+
