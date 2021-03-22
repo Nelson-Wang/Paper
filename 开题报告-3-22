@@ -1,0 +1,52 @@
+1.	主要文献资料
+[1]Yan Y， Dittmann L. Energy Efficiency in Ethernet Passive Optical Networks(EPONs): Protocal Design and Performance Evalution [J]. Journal of Communications， 2011， 6(3): 249-261.
+[2]ITU-T Series G Supplement45，“GPON power conservation”，2009.
+[3] Yan Y, Wong S, et al. Energy Management Mechanism for Ethernet Passive Optical Networks (EPONs)[C].IEEE International Conference on Communications. IEEE, 2010.
+[4] J H Jung, W H Yang, and Y C Kim. A bandwidth allocation algorithm for improving QoS in EPON with sleep mode[C]. International Conference on Information Networking(ICOIN), 2012, pp:324-328.
+[5] Y Yan, L Dittmann. Analysis of Sleep-Mode Downlink Scheduling Operations in EPON Systems[C]. Communications & Signal Processing，2011，43 (2):1-5.
+[6] A Dhaini, P H Ho, et al. Energy efficiency in TDMA-based next-generation passive optical   access networks[J].IEEE/ACM Transactions on Networking,2014,22(3):850-863.
+[7] ZHANG Jingjing,  ANSARI N. Toward energy-efficient 1G-EGPON and 10G-EGPON with sleep-aware MAC control and scheduling [J] . IEEE Communications Magazine 2011，49 (2):33-38.
+[8] Sleep/doze controlled dynamic bandwidth allocation algorithms for energy-efficient passive optical networks
+[9] Energy-efficiency improvements for optical access
+[10] Energy-efficiency PON with sleep-mode ONU:progress challenges and solutions
+[11] Multi-gateway multi-path routing protocol for 802. 11 s WMN  2010
+[12] Energy and delay aware routing algorithm for fiber-wireless networks  2014
+
+[13] 自适应 QoS 感知的以太网无源光网络节能机制
+[14] 自适应延迟感知的光无线混合宽带接入网节能机制
+
+2.对所阅读文献的综述
+信息及相关通信技术的飞速发展，导致了大量的温室气体排放和巨大的能耗，这对全球气候变暖和能源危机都产生了重大的影响。许多学者积极投身于与节能技术相关的研究中，以解决此类能耗问题。作为电信网络的最后一公里，无源光网络PON（Passive Optical Network）因其低成本，高可靠性，高容量等很多优点，被一致认为是最有潜力的接入网技术，然而由于PON的广泛部署和其中数据传输速率的持续增加，导致了网络能耗的急剧增加，为此 PON接入网的节能降耗问题仍是众多学者关注和研究的热点。
+在PON系统中，位于中心局的光线路终端(OLT) 经过远端节点，通过光纤连接到位于用户端的光网络单元( ONU)。OLT掌管着所有 ONU 的资源和相应的调度策略，而 ONU 是以时分复用的方式接入到 OLT，其仅在被分配的时隙窗口中传输待传的上行数据。由于ONU在仅有少量数据，甚至没有数据到达的情况下仍需保持工作的活跃状态，以持续地监听和检测是否有 OLT 的下行数据到达，因此 ONU在整个PON 网络的能耗中占据绝大部分。有研究表明，在一个包含无源光网络、无线路由器等网元设备的 IP 网络中，以 OLT 和 ONU 为例，ONU的能耗占据了网络总能耗的60% ，OLT的能耗占据了网络总能耗的 7%[1]。因此，关于对ONU 和 OLT 进行工作状态的管控以达到节能目的的研究变得至关重要。
+国际电信联盟远程通信标准化组织(ITU-T)一直在探索通过在接入网范围内减少能量消耗来提高能源保护的解决方案[2]。ITU-T在研究过程中，提出并讨论了多种节能技术。根据ONU处于节能模式时发射机和接收机的运行情况，可以将这些节能技术分为三类：ONU电源限制、ONU半休眠和ONU休眠。
+ONU电源限制(Power Shedding) 主要应用于ONU使用电池供电的场景，节能的方法是在保持光链路正常运行的情况下，将其中某些不常用的服务和功能断开，从而减少功率、降低能耗。
+ONU半休眠(Dozing) 是指ONU的接收机开启，而发射机在关闭和开启之间转换，如果没有上行数据需要发送，则丢弃OLT的上行授权。处于这种状态下的ONU在收到OLT的命令或者本地的触发后立即退出半休眠状态。
+ONU休眠(Sleeping) 是指ONU的接收机和发射机均在关闭和开启之间转换，其又可以分为ONU深度休眠和ONU快速休眠。ONU深度休眠(Deep Sleep)是指当ONU处于深度休眠时，发射机和接收机一直处于关闭状态，除了激活功能外的所有功能和服务均关闭。激活功能的作用是，当收到本地的触发后，使ONU退出深度休眠状态。ONU快速休眠(Fast Sleep)是指ONU的休眠过程由连续的体眠周期组成，每个休眠周期又分成休眠阶段和激活阶段。在休眠阶段中，ONU的接收机和发射机均关闭，其他非必须的功能也关闭，只有计时功能和激活检测功能开启。在激活阶段，接收机和发射机和其他支撑功能均开启。
+通常在采用广播方式发送下行数据的 PON 系统中，各个 ONU 根据收到的 GATE 帧中的信息选择性地接收属于自己的信息，而丢弃不属于自己信息。因此在这个过程中，ONU 一直处于工作模式并接收到大量无用的数据，产生了不必要的能耗。为了减少能源消耗，当 ONU不需要接收或发送数据时，ONU 被设计为进入睡眠模式。在睡眠期间，ONU 关闭收发机及其相关电路以降低能，与此同时，ONU 会在下一个轮询周期到来之前被 OLT 提前唤醒。针对上述问题，Yan Y, Wong S等提出了一种能量管理机制[3](EMM，Energy Management Mechanism)，EMM 包含了两种不同的ONU睡眠控制机制，即上行中心调度（UCS，Upstream
+Centric Scheduling）机制和下行中心调度（DCS，Downstream Centric Scheduling）机制。
+在 UCS 方案中，OLT 仅根据 ONU 上行数据情况来为 ONU 分配睡眠及唤醒的时间，而不关注某一时间段是否有下行数据的存在。一开始，所有 ONU 上电进行初始化操作，OLT通过轮询每个 ONU，根据收到的 REPORT 帧中的信息，来为相应的 ONU 授权上行带宽。下行数据业务必须等到ONU授权的上行时隙才能进行传输，UCS 方案的睡眠时间完全取决于上行数据的大小，因此控制较为简便，节能效果相对较好，但是缺点是下行数据时延较大，不适用于对时延敏感的业务。
+在 DCS 方案中，上行数据的发送及 ONU 的唤醒与 UCS 方案相同，与 UCS 不同的是，当链路中只要有数据（上行或下行）到达或需要发送时，ONU 将会被唤醒进入工作模式，当且仅当链路中无数据（上行或下行）时，ONU才会进入低功耗模式。在下行方向，存在 GATE帧和 GATEDC帧两种授权帧。常规 GATE 帧用于向 ONU 分配授权时隙的大小与发送上行数据的时刻，GATEDC帧用于唤醒 ONU 接收下行数据，若 OLT 有下行数据要发送给 ONU，则GATEDC帧将会包含 ONU 唤醒接收数据的时间。DCS 方案相对于 UCS 方案，下行数据的接收更加灵活，因此大大降低了下行数据时延，提高了服务质量但是节能效果相对较差。
+上述研究大部分只考虑到了节能效率的问题,ONU节能机制的提出要同时考虑到其他网络要素,如服务质量要求QoS,而网络的服务质量要求主要体现在延迟、带宽利用率、延迟抖动、以及对多等级业务及不同时延需求支持等多个方面。
+上行中心调度机制UCS及下行中心调度机制DCS等对网络的节能效率及服务质量要求的影响都依赖于节能机制算法所决定的ONU休眠周期,在上述节能机制基础上考虑到使ONU的休眠时间最大化但要同时满足网络的服务质量要求QoS,来权衡节能效率与QoS这两个互为矛盾的性能指标。
+J H Jung, W H Yang在UCS上行中心调度机制的基础上设计一种节能算法,将上、下行业务量与阈值比较计算授权带宽[4]。OLT向ONU发送GATE帧,ONU接收到GATE帧后,向OLT发送REPORT帧来报告上行带宽请求。当OLT接收到REPORT帧信息后,OLT的轮询表将发生更新,而且OLT根据轮询表记录,计算出各个ONU不同的时隙。OLT检测出缓存在OLT的下行数据流量是否超过预设的阈值如果下行缓存的数据超过该阈值,OLT再将阈值与ONU的上行带宽请求进行比较，最后确定分配给ONU的带宽。该算法可以降低下行传输时延,缺点是会改变整个轮询周期,在一定程度上影响上行的服务质量,会导致增加上行业务的延时。
+下行中心调度DCS机制中,只要有上行或下行数据到达,ONU必须唤醒成正常状态来进行传输和接收数据,0NU1在活跃状态接收了下行业务数据ddl1,然后下行业务调度器授予下行数据ddl2给ONU2,根据先入先出FIFO规则,接着分配给0NU1的下行数据ddl2接着被下行调度传输,这样导致ONU1从休眠状态又转换回正常状态,所以应该采用先进的下行业务调度算法[5],考虑下行数据的目标ONU的休眠状况来减少ONU状态切换频率,以及保证实时（real time）数据被优先选择进行传输来提高对延时敏感的网络业务的服务质量要求QoS。新的下行业务调度算法使用权重来定义不同数据队列的优先级选择权,下行数据队列调度的输出顺序依赖于权重的优先级;将根据以下三种情况来分配权重的优先顺序,第一种对刚到达的下行数据队列按照服务等级CoS(Class of Service)被分类,而且缓存在相应的优先级的队列当中;第二种情况OLT知晓所有ONU休眠是否的状况,将要分配给处于活跃状态的ONU的数据队列获得次高级优先权重;第三种情况将排列等待很长时间的队列数据授予基本优先级权重。对下行数据队列按照业务情况和ONU是否处于休眠状态设置不同的优先级权重,该下行业务调度算法能够保证延时敏感的实时数据的服务质量要求而且能避免处于休眠状态的ONU频繁切换而达到最大化地节能。
+A Dhaini, P H Ho提出了一种新型的绿色动态带宽分配算法GBA架构[6],具有前面提到的基于上行中心调度机制UCS-based的批量传输模式框架和SAS(Sort-And-Shift)睡眠时间调度机制，基于上行中心调度机制的机制可以最大限度地节能;在上、下行传输方向使用批量传输模式,能够减少在频繁状态和活跃状态间频繁切换带来的开销时间,使ONU的睡眠时间处于最大化。计算得出ONU最大休眠时间是该GBA架构的核心,因此提出了以M/G/I排队系统的分析模型,计算出各个服务等级类型CoS的期望延迟和最大延迟,得到了在等级服务限制条件下的ONU睡眠时间的近似表达式,通过优化节能效率得到最大的休眠时间同时没有损害各服务类型的服务质量要求QoS。随着分配好的休眠时钟到达,ONU苏醒后,立即直接传输缓存的数据,消除了睡眠之后经过OLT和0NU的授权和许可的步骤，而SAS(Sort-And-Shift)睡眠时间调度机制有效地同步了所有ONU的睡眠时间而且没有对所有分配的睡眠时间作出妥协,因此能够最大化地节能。
+针对ONU利用率低及不同优先级数据具有不同延迟容忍度的特点，国内外研究人员提出了多种节能机制。ZHANG Jingjing,  ANSARI N提出了基于MAC(media access control)层调度的ONU休眠机制[7],OUN根据需要发送的数据量，选择最优的发射机和接收机，此种机制增加了网络设备的成本。DIAS M P I,  WONG E提出了ONU周期性休眠的节能机制[8-9]，OLT 计算最优的休眠时隙并发送给 ONU，ONU发送确认消息给 OLT 并进行休眠，此种机制需要在每次休眠开始的时候都交换信息，连续休眠 ONU 的能量效率较低。SHI Lei，MUKHERJEE B, LEE S S提出了服务等级区分的节能机制[10]，ONU 根据不同服务等级给数据分配时隙，ONU在其他时隙进行休眠，此种机制的 ONU 休眠周期不能随数据的到达率自适应变化，ONU 休眠的效率低。HU Y, HE W提出了多网关多路径的均衡负载机制[11]，减少网关的拥塞。此种机制没有考虑到网关的休眠，休眠将会使其性能恶化。ALI A，ALI K提出了动态感知的节能机制[12],数据从最小延迟的路径进行转发,网关动态地感知负载的大小,根据动态的阈值进行休眠和唤醒转发数据。此种机制没有考虑数据的延迟特性!频繁地切换消耗大量的能量。
+为了充分利用不同优先级数据具有不同延迟容忍度，杨静，周超提出了一种QoS感知的节能机制(QoS-aware energy saving mechanism, QESM)[11]。高优先级数据的ONU 在OLT 分配的确认时隙之外休眠，低优先级数据的ONU 根据延迟容忍特性连续休眠多个轮询周期，进而在满足用户 QoS 性能的要求下能量效率达到最优。与传统的休眠机制相比，能有效提高 ONU的能量效率，并使用户的 QoS 性能提高。王汝言提出了一种延迟感知的节能机制(DESM)，为了充分利用数据的延迟容忍度，休眠网关根据下行数据的到达率自适应选择休眠周期增长速率，同时，采用多网关均衡负载机制，减小休眠网关带来的路径重建的延迟和网关的拥塞，从而使网络中数据在满足延迟要求下能量效率达到最优。与传统的机制相比，该机制不仅减小了数据的延迟，同时，有效地提高了网关的能量效率!改善了网关资源的利用率。
+ 
+三、选题报告
+1.
+
+2.课题研究的目的、意义
+在PON系统中，研究实现的节能技术有很多种，其中，设置ONU进入睡眠模式被认为是最有效的节能方法。JeffMandin最早由提出ONU休眠的思想，并且对于EPON的节能，在EPON网络系统的MPCP多点控制协议基础上设计了一个可扩展的睡眠协议。此后,国内外己有许多学者提出光接入网系统的ONU休眠机制,从不同的节能算法、不同的角度等方面，讨论和研究睡眠机制以及低能耗模式的最佳解决方法。
+在 2011 年时 A.R.Dhaini提出了 GBA的思想，即根据上下行的数据包到达率、OLT和 ONU 的缓存大小等设计算法计算每个 ONU 的最长睡眠时间，当睡眠结束时将 OLT 和 ONU 的数据缓存传输完毕。这种方式的节能效果比较好，但仅适用于负载量比较低的 ONU，并且对时延不敏感。
+同年 Y.Yan and L.Dittmann提出了两种策略：UCS（the  upstream  centric scheme），DCS（the downstream centric scheme）。在 UCS 中，OLT 缓存下行的数据直到各个ONU在上行传输时开始传输下行数据，这可以实现比较好的节能效果，但当上下行负载量不等的时候会带来比较大的时延；在 DCS 中，ONU 在上行和下行数据到来时都需要醒来进行数据传输，这可以降低上下行的时延，但节能效果相对较差。
+2013 年 L.Zhang提出了分别考虑上下行的传输，并且分别针对上行和下行进行独立的发射机和接收机的休眠，这样的节能效果比较好，但在实际的应用中，接收机如果不考虑发射机状态的情况下进入休眠，那么在发射机工作时就无法接收到 OLT发来的控制和确认信息。
+ 2015 年 G.Shagdar提出的设定固定 ONU 的睡眠时间，并且睡眠时间有短睡眠和长睡眠两种，在通过计算缓存和可最大睡眠时间来选择合适的固定睡眠时间。这样做的好处是能够让 OLT 随时知晓 ONU 的工作状态，从而不会引起丢包现象，并且产生的节能效果也比较好，但这只基于上行或者下行来考虑的，没有双向同时考虑，对系统可能会有影响。
+2016 年 I-S.Hwang提出将 ONU 的上行数据根据时延要求进行分级，从而在数据传输时优先传输对时延要求高的数据，对于剩余的传输带宽再传输剩余的数据，如果没有剩余带宽，可以将这些数据进行缓存，直到有传输带宽时再进行传输。这样，OLT 就可以根据各个 ONU 的 REPORT 信息来决定 ONU 该采取哪种休眠方式，从而最大程度的不影响QoS。
+
+通过上述国内外现状分析，现有的PON节能技术还有诸多问题：
+
+ 
+拟解决的关键问题
+1、目前ONU
