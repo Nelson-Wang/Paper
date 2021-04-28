@@ -10,3 +10,4 @@ https://www.itu.int/ITU-T/recommendations/rec.aspx?rec=12794&lang=zh
     （2）提出根据预测误差自适应调整下一个周期流量预测值的方法，从而使ONU睡眠时间不会过长，减少由预测误差带来的时延。
 
 https://blog.csdn.net/xlgen157387/article/details/47710473、
+https://blog.csdn.net/HeavenDan/article/details/115265272
